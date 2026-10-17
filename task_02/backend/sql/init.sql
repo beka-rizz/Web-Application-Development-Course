@@ -1,0 +1,20 @@
+CREATE TABLE habits (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name VARCHAR(120) NOT NULL,
+  description VARCHAR(500) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE checkins (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  habit_id INT UNSIGNED NOT NULL,
+  checked_on DATE NOT NULL,
+  note VARCHAR(280) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_checkin_habit_day (habit_id, checked_on),
+  CONSTRAINT fk_checkins_habit
+    FOREIGN KEY (habit_id) REFERENCES habits (id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
