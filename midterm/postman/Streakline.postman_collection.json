@@ -1,0 +1,492 @@
+{
+  "info": {
+    "_postman_id": "streakline-habit-tracker",
+    "name": "Streakline Habit Tracker",
+    "description": "Run this collection from top to bottom with the Collection Runner while `docker compose up` is running. The tests save habitId and checkinId for the later requests.\n\nbaseUrl defaults to http://localhost:3000. Dates are computed in UTC before each request.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "habitId",
+      "value": "1"
+    },
+    {
+      "key": "checkinId",
+      "value": "1"
+    },
+    {
+      "key": "asOf",
+      "value": "2026-10-31"
+    },
+    {
+      "key": "day0",
+      "value": "2026-10-31"
+    },
+    {
+      "key": "day1",
+      "value": "2026-10-30"
+    },
+    {
+      "key": "day2",
+      "value": "2026-10-29"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "function shift(days) {",
+          "  const date = new Date();",
+          "  date.setUTCDate(date.getUTCDate() + days);",
+          "  return date.toISOString().slice(0, 10);",
+          "}",
+          "pm.collectionVariables.set('asOf', shift(0));",
+          "pm.collectionVariables.set('day0', shift(0));",
+          "pm.collectionVariables.set('day1', shift(-1));",
+          "pm.collectionVariables.set('day2', shift(-2));"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "description": "Confirms the API can reach MySQL.",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health",
+            "description": "GET /health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('database is up', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.eql('ok');",
+                  "  pm.expect(body.database).to.eql('up');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Habits",
+      "description": "List, create, update, and the validation errors. Delete is in Cleanup so the check-in requests still have a habit.",
+      "item": [
+        {
+          "name": "Create habit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/habits",
+            "description": "POST /habits",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Read 20 pages\",\n  \"description\": \"A paper book before bed.\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('creates a habit', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.name).to.eql('Read 20 pages');",
+                  "  pm.expect(body.current_streak).to.eql(0);",
+                  "  pm.collectionVariables.set('habitId', String(body.id));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List habits",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/habits?as_of={{asOf}}",
+            "description": "GET /habits?as_of=YYYY-MM-DD"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('lists the new habit', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.as_of).to.eql(pm.collectionVariables.get('asOf'));",
+                  "  const ids = body.habits.map(function (habit) { return String(habit.id); });",
+                  "  pm.expect(ids).to.include(pm.collectionVariables.get('habitId'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update description",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/habits/{{habitId}}",
+            "description": "PATCH /habits/{id}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Thirty pages, not twenty.\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('patches one field', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.name).to.eql('Read 20 pages');",
+                  "  pm.expect(body.description).to.eql('Thirty pages, not twenty.');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a habit with no name",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/habits",
+            "description": "POST /habits with no name.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Nope\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('name is required', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().error).to.eql('name is required.');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get a missing habit",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/habits/999999/stats",
+            "description": "GET /habits/999999/stats"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('missing habit', function () {",
+                  "  pm.response.to.have.status(404);",
+                  "  pm.expect(pm.response.json().error).to.eql('Habit not found.');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Check-ins",
+      "description": "Create check-ins. One check-in per habit per day.",
+      "item": [
+        {
+          "name": "Reject a date before 2000",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/habits/{{habitId}}/checkins",
+            "description": "POST /habits/{id}/checkins with an out-of-range date.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"checked_on\": \"1999-12-31\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('date is rejected', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().error).to.include('YYYY-MM-DD');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log today",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/habits/{{habitId}}/checkins",
+            "description": "POST /habits/{id}/checkins",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"checked_on\": \"{{day0}}\",\n  \"note\": \"Finished the chapter.\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('logs today', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.checked_on).to.eql(pm.collectionVariables.get('day0'));",
+                  "  pm.expect(body.note).to.eql('Finished the chapter.');",
+                  "  pm.collectionVariables.set('checkinId', String(body.id));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log yesterday",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/habits/{{habitId}}/checkins",
+            "description": "A second day, so today and yesterday form a two-day streak.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"checked_on\": \"{{day1}}\",\n  \"note\": \"Started the chapter.\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('logs yesterday', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  pm.expect(pm.response.json().checked_on).to.eql(pm.collectionVariables.get('day1'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a duplicate day",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/habits/{{habitId}}/checkins",
+            "description": "The same habit cannot log one date twice.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"checked_on\": \"{{day0}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('duplicate day', function () {",
+                  "  pm.response.to.have.status(409);",
+                  "  pm.expect(pm.response.json().error).to.eql('Already checked in on this date.');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Stats",
+      "description": "Today and yesterday are consecutive, so the current streak is 2.",
+      "item": [
+        {
+          "name": "Get stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/habits/{{habitId}}/stats?as_of={{asOf}}",
+            "description": "GET /habits/{id}/stats?as_of=YYYY-MM-DD"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('current streak is the two-day run', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.as_of).to.eql(pm.collectionVariables.get('asOf'));",
+                  "  pm.expect(body.total_checkins).to.eql(2);",
+                  "  pm.expect(body.current_streak).to.eql(2);",
+                  "  pm.expect(body.longest_streak).to.eql(2);",
+                  "  pm.expect(body.checked_in_on).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cleanup",
+      "description": "Deletes the check-in created above, then the habit. Run this last.",
+      "item": [
+        {
+          "name": "Delete check-in",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/habits/{{habitId}}/checkins/{{checkinId}}",
+            "description": "DELETE /habits/{id}/checkins/{checkin_id}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('deletes the check-in', function () {",
+                  "  pm.response.to.have.status(204);",
+                  "  pm.expect(pm.response.text()).to.eql('');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete habit",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/habits/{{habitId}}",
+            "description": "DELETE /habits/{id}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('deletes the habit', function () {",
+                  "  pm.response.to.have.status(204);",
+                  "  pm.expect(pm.response.text()).to.eql('');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get the deleted habit",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/habits/{{habitId}}/stats",
+            "description": "GET /habits/{id}/stats after delete."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('habit is gone', function () {",
+                  "  pm.response.to.have.status(404);",
+                  "  pm.expect(pm.response.json().error).to.eql('Habit not found.');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
