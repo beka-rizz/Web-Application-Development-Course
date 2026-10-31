@@ -1,0 +1,142 @@
+{
+  "info": {
+    "name": "Space Bounty Hunters",
+    "description": "Wanted criminals and bounty hunting journal.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8000"
+    }
+  ],
+  "item": [
+    {
+      "name": "Criminals",
+      "item": [
+        {
+          "name": "List criminals",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/criminals/"
+          }
+        },
+        {
+          "name": "Filter and sort criminals",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/criminals/?min_reward=5000&armed=true&sort=-reward"
+          }
+        },
+        {
+          "name": "Filter by max reward, crew, and escape",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/criminals/?max_reward=10000&has_crew=false&escape_master=true&sort=reward"
+          }
+        },
+        {
+          "name": "Get criminal details",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/criminals/1/"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Hunts",
+      "item": [
+        {
+          "name": "List hunt logs",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/hunts/"
+          }
+        },
+        {
+          "name": "Filter hunt logs by criminal",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/hunts/?criminal_id=5"
+          }
+        },
+        {
+          "name": "Get one hunt log",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/hunts/1/"
+          }
+        },
+        {
+          "name": "Record a capture attempt",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"criminal_id\": 3,\n  \"success\": false,\n  \"notes\": \"Target escaped through an asteroid field.\"\n}"
+            },
+            "url": "{{baseUrl}}/api/hunts/"
+          }
+        },
+        {
+          "name": "Update hunt success or notes",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"success\": true,\n  \"notes\": \"Captured after the second pass.\"\n}"
+            },
+            "url": "{{baseUrl}}/api/hunts/1/"
+          }
+        },
+        {
+          "name": "Delete a hunt log",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/hunts/10/"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Invalid requests",
+      "item": [
+        {
+          "name": "Unknown criminal id",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/criminals/999/"
+          }
+        },
+        {
+          "name": "Hunt for a criminal that does not exist",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"criminal_id\": 999,\n  \"success\": false,\n  \"notes\": \"No such target in the database.\"\n}"
+            },
+            "url": "{{baseUrl}}/api/hunts/"
+          }
+        },
+        {
+          "name": "Invalid sort value",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/criminals/?sort=name"
+          }
+        }
+      ]
+    }
+  ]
+}
